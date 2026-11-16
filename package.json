@@ -1,0 +1,25 @@
+{
+  "name": "cold-circle",
+  "version": "0.1.0",
+  "description": "Cold Circle — a lightweight, single-host chat/file/bulletin system inspired by Hotline. (Phase 0–1: skeleton + public chat)",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "dev": "tsc --watch",
+    "smoke": "node scripts/smoke-test.mjs"
+  },
+  "dependencies": {
+    "js-yaml": "^4.1.0",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^22.10.0",
+    "@types/ws": "^8.5.13",
+    "typescript": "5.7"
+  }
+}

@@ -1,0 +1,8 @@
+node_modules/
+dist/
+*.log
+.DS_Store
+
+# Real configs hold secrets — never commit them.
+coldcircle.config.yaml
+!coldcircle.config.example.yaml

@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install)",
+      "Bash(npm run *)",
+      "Bash(cd *)",
+      "Bash(tail *)",
+      "Bash(node *)",
+      "Bash(sleep *)",
+      "Bash(curl *)",
+      "Bash(ls *)"
+    ]
+  },
+  "$version": 4
+}

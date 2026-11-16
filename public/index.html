@@ -1,0 +1,1655 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Cold Circle</title>
+  <style>
+    :root {
+      --bg: #0a0e14;
+      --bg-panel: #0f1620;
+      --bg-input: #0b1118;
+      --fg: #c7d3e0;
+      --fg-dim: #6f8094;
+      --accent: #38e0c8;
+      --accent-dim: #1c6f63;
+      --warn: #e0a238;
+      --danger: #e0524a;
+      --border: #1d2733;
+      --mono: "SFMono-Regular", "JetBrains Mono", "Menlo", "Consolas", monospace;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0; height: 100%;
+      background: var(--bg); color: var(--fg);
+      font-family: var(--mono); font-size: 13px; line-height: 1.45;
+    }
+    #app { display: flex; flex-direction: column; height: 100vh; }
+
+    /* Top status bar */
+    header {
+      display: flex; align-items: center; gap: 12px;
+      padding: 8px 14px; background: var(--bg-panel);
+      border-bottom: 1px solid var(--border); white-space: nowrap;
+    }
+    header .title { color: var(--accent); letter-spacing: 1px; }
+    header .spacer { flex: 1; }
+    header .meta { color: var(--fg-dim); }
+    .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+      background: var(--fg-dim); vertical-align: middle; margin-right: 6px; }
+    .dot.on { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
+    .dot.off { background: var(--danger); }
+
+    /* Main split */
+    main { flex: 1; display: flex; min-height: 0; }
+    .col { display: flex; flex-direction: column; min-height: 0; }
+    .col.chat { flex: 1; }
+    .col.side { width: 300px; border-left: 1px solid var(--border); }
+
+    .pane-head {
+      display: flex; align-items: center; gap: 8px;
+      padding: 6px 10px; background: var(--bg-panel); border-bottom: 1px solid var(--border);
+    }
+    .pane-head .label { color: var(--accent); }
+    .pane-head select, .pane-head input {
+      background: var(--bg-input); color: var(--fg); border: 1px solid var(--border);
+      border-radius: 3px; padding: 2px 6px; font-family: inherit; font-size: 12px;
+    }
+    .pane-head .window { color: var(--fg-dim); margin-left: auto; }
+
+    /* Message list — cap height so bulletin gets more space */
+    #messages {
+      max-height: 45vh; flex: 1; overflow-y: auto; padding: 8px 10px; min-height: 0;
+    }
+    .msg { margin: 2px 0; white-space: pre-wrap; word-break: break-word; }
+    .msg .who { color: var(--accent); font-weight: bold; }
+    .msg .self .who { color: var(--warn); }
+    .msg .ts { color: var(--fg-dim); }
+    .msg .body { color: var(--fg); }
+    .system { color: var(--fg-dim); font-style: italic; }
+
+    /* Composer */
+    .composer { display: flex; gap: 6px; padding: 8px 10px;
+      border-top: 1px solid var(--border); background: var(--bg-panel); }
+    .composer input {
+      flex: 1; background: var(--bg-input); color: var(--fg);
+      border: 1px solid var(--border); border-radius: 3px; padding: 6px 8px;
+      font-family: inherit; font-size: 13px;
+    }
+    .composer input:disabled { opacity: 0.5; }
+    .composer button {
+      background: var(--accent-dim); color: #04110e; border: 0; border-radius: 3px;
+      padding: 6px 12px; font-family: inherit; cursor: pointer;
+    }
+    .composer button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* File browser */
+    .file-section { flex: 0 0 auto; max-height: 25%; overflow-y: auto; border-top: 1px solid var(--border); }
+    .file-section .pane-head {
+      display: flex; align-items: center; gap: 6px;
+    }
+    .file-section .pane-head .label { color: var(--accent); }
+    .file-section .pane-head .refresh-btn {
+      margin-left: auto; background: var(--bg-input); color: var(--fg-dim);
+      border: 1px solid var(--border); border-radius: 3px; padding: 1px 6px;
+      font-family: inherit; font-size: 11px; cursor: pointer;
+    }
+    .file-section .pane-head .refresh-btn:hover { color: var(--accent); }
+    .file-list { padding: 4px 8px; display: flex; flex-direction: column; gap: 2px; }
+    .file-entry {
+      display: flex; align-items: center; gap: 6px;
+      padding: 3px 6px; border-radius: 3px; font-size: 12px;
+    }
+    .file-entry:hover { background: var(--bg-input); }
+    .file-entry .f-icon { color: var(--accent-dim); width: 16px; text-align: center; }
+    .file-entry .f-name { flex: 1; color: var(--fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .file-entry .f-size { color: var(--fg-dim); font-size: 11px; white-space: nowrap; }
+    .file-entry .f-actions { display: flex; gap: 4px; }
+    .file-entry .f-actions button {
+      background: none; border: 0; color: var(--fg-dim); cursor: pointer;
+      font-family: inherit; font-size: 12px; padding: 0 2px;
+    }
+    .file-entry .f-actions button:hover { color: var(--accent); }
+    .file-entry .f-actions button.del:hover { color: var(--danger); }
+    .file-upload-area {
+      padding: 4px 8px; border-top: 1px solid var(--border);
+      display: flex; gap: 4px;
+    }
+    .file-upload-area button {
+      flex: 1; background: var(--accent-dim); color: #04110e;
+      border: 0; border-radius: 3px; padding: 4px 8px;
+      font-family: inherit; font-size: 11px; cursor: pointer;
+    }
+    .file-upload-area button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .file-empty { color: var(--fg-dim); padding: 4px 8px; font-size: 11px; }
+    .file-progress { padding: 2px 8px; font-size: 11px; color: var(--warn); }
+
+    /* Bulletin board */
+    .bulletin-section {
+      flex: 0 0 auto; max-height: 40%; overflow-y: auto; border-top: 1px solid var(--border);
+    }
+    .bulletin-section .pane-head .label { color: var(--accent); }
+    .bulletin-list { padding: 4px 8px; display: flex; flex-direction: column; gap: 4px; }
+    .bulletin-entry {
+      padding: 4px 6px; border-radius: 3px; font-size: 12px;
+      border-left: 2px solid var(--accent-dim);
+    }
+    .bulletin-entry .b-handle { color: var(--accent); font-weight: bold; }
+    .bulletin-entry .b-body { color: var(--fg); margin-top: 2px; }
+    .bulletin-entry .b-ts { color: var(--fg-dim); font-size: 10px; }
+    .bulletin-empty { color: var(--fg-dim); padding: 4px 8px; font-size: 11px; }
+    .bulletin-input-row { display: flex; gap: 4px; padding: 4px 8px; border-top: 1px solid var(--border); }
+    .bulletin-input-row input {
+      flex: 1; background: var(--bg-input); color: var(--fg);
+      border: 1px solid var(--border); border-radius: 3px;
+      padding: 4px 8px; font-family: inherit; font-size: 12px;
+    }
+    .bulletin-input-row input:disabled { opacity: 0.5; }
+    .bulletin-input-row button {
+      background: var(--accent-dim); color: #04110e; border: 0; border-radius: 3px;
+      padding: 4px 8px; font-family: inherit; font-size: 11px; cursor: pointer;
+    }
+    .bulletin-input-row button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* Side panels */
+    .side .pane-head { position: sticky; top: 0; }
+    .presence { padding: 8px 10px; }
+    .presence .handle { padding: 3px 0; color: var(--fg); cursor: pointer; }
+    .presence .handle:hover { color: var(--accent); }
+    .presence .handle .dot.on { background: var(--accent); }
+    .notice { padding: 8px 10px; color: var(--fg-dim); font-size: 12px; border-top: 1px solid var(--border); }
+
+    /* Side sections (presence + DMs) */
+    .section { display: flex; flex-direction: column; min-height: 0; }
+    .section.presence-section { flex: 0 0 auto; max-height: 32%; overflow-y: auto; }
+    .section.dm-section { flex: 1 1 auto; min-height: 0; }
+    .dm-list { flex: 1; overflow-y: auto; padding: 6px; display: flex; flex-direction: column; gap: 6px; }
+    .dm-empty { color: var(--fg-dim); padding: 6px; font-size: 12px; }
+
+    /* DM conversation pane */
+    .dm {
+      border: 1px solid var(--border); border-radius: 4px; display: flex; flex-direction: column;
+      background: var(--bg-input); max-height: 46%;
+    }
+    .dm-head { display: flex; align-items: center; gap: 6px; padding: 4px 8px;
+      border-bottom: 1px solid var(--border); font-size: 12px; }
+    .dm-title { color: var(--accent); font-weight: bold; }
+    .dm-badge { font-size: 10px; color: var(--warn); border: 1px solid var(--warn);
+      border-radius: 3px; padding: 0 4px; }
+    .dm-offline { color: var(--danger); font-size: 10px; }
+    .dm-keep { margin-left: auto; display: flex; align-items: center; gap: 3px;
+      font-size: 10px; color: var(--fg-dim); cursor: pointer; }
+    .dm-keep input { margin: 0; }
+    .dm-close { background: none; border: 0; color: var(--fg-dim); cursor: pointer; font-size: 13px;
+      line-height: 1; }
+    .dm-close:hover { color: var(--danger); }
+    .dm-body { flex: 1; overflow-y: auto; padding: 6px 8px; min-height: 36px; }
+    .dm-input { display: flex; gap: 4px; border-top: 1px solid var(--border); }
+    .dm-input input { flex: 1; background: var(--bg); color: var(--fg); border: 0;
+      padding: 5px 8px; font-family: inherit; font-size: 12px; }
+    .dm-input input:disabled { opacity: 0.4; }
+    .dm-input button { background: var(--accent-dim); color: #04110e; border: 0;
+      border-radius: 3px; padding: 0 8px; font-family: inherit; cursor: pointer; }
+    .dm-input button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* Connection overlay */
+    #connect {
+      position: fixed; inset: 0; background: rgba(5, 8, 12, 0.92);
+      display: flex; align-items: center; justify-content: center; z-index: 10;
+    }
+    #connect .card {
+      background: var(--bg-panel); border: 1px solid var(--border);
+      border-radius: 6px; padding: 24px; width: 320px;
+    }
+    #connect h1 { color: var(--accent); margin: 0 0 4px; font-size: 18px; letter-spacing: 2px; }
+    #connect p { color: var(--fg-dim); margin: 0 0 16px; font-size: 12px; }
+    #connect label { display: block; margin: 10px 0 4px; color: var(--fg-dim); font-size: 12px; }
+    #connect input {
+      width: 100%; background: var(--bg-input); color: var(--fg);
+      border: 1px solid var(--border); border-radius: 3px; padding: 7px 8px;
+      font-family: inherit; font-size: 13px;
+    }
+    #connect button {
+      margin-top: 18px; width: 100%; background: var(--accent); color: #04110e;
+      border: 0; border-radius: 3px; padding: 9px; font-family: inherit; font-weight: bold;
+      cursor: pointer; letter-spacing: 1px;
+    }
+    .hidden { display: none !important; }
+
+    /* Toast */
+    #toasts { position: fixed; bottom: 12px; right: 12px; display: flex;
+      flex-direction: column; gap: 6px; z-index: 20; }
+    .toast {
+      background: var(--bg-panel); border: 1px solid var(--danger);
+      color: var(--fg); padding: 8px 12px; border-radius: 4px; font-size: 12px;
+      max-width: 320px;
+    }
+    .toast.warn { border-color: var(--warn); }
+    .toast.info { border-color: var(--accent-dim); }
+    ::-webkit-scrollbar { width: 8px; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+    /* Admin panel styles (Phase 5) */
+    .admin-section { border-top: 2px solid var(--danger); }
+    .admin-section .pane-head { background: #1a0a0a; }
+    .admin-section .pane-head .label { color: var(--danger); }
+    .admin-toggle {
+      background: var(--bg-input); color: var(--fg-dim);
+      border: 1px solid var(--border); border-radius: 3px;
+      padding: 1px 6px; font-family: inherit; font-size: 11px; cursor: pointer;
+      margin-left: auto;
+    }
+    .admin-toggle:hover { color: var(--danger); }
+    .admin-tabs {
+      display: flex; gap: 2px; padding: 4px 8px; flex-wrap: wrap;
+      background: var(--bg-input); border-bottom: 1px solid var(--border);
+    }
+    .admin-tab {
+      background: var(--bg-panel); color: var(--fg-dim);
+      border: 1px solid var(--border); border-radius: 3px;
+      padding: 3px 8px; font-family: inherit; font-size: 11px; cursor: pointer;
+    }
+    .admin-tab.active { background: var(--danger); color: #fff; border-color: var(--danger); }
+    .admin-tab:hover:not(.active) { color: var(--accent); }
+    .admin-panel { padding: 6px 8px; max-height: 200px; overflow-y: auto; }
+    .admin-panel .admin-empty { color: var(--fg-dim); font-style: italic; }
+    .admin-panel .admin-row {
+      display: flex; gap: 8px; padding: 2px 0; font-size: 11px;
+      border-bottom: 1px solid var(--border);
+    }
+    .admin-panel .admin-row .key { color: var(--accent); min-width: 100px; }
+    .admin-panel .admin-row .val { color: var(--fg); flex: 1; word-break: break-all; }
+    .admin-panel .admin-btn {
+      background: var(--danger); color: #fff; border: 0; border-radius: 2px;
+      padding: 2px 6px; font-family: inherit; font-size: 10px; cursor: pointer;
+      margin-left: 8px;
+    }
+    .admin-panel .admin-btn:hover { opacity: 0.85; }
+    .admin-panel .admin-input {
+      background: var(--bg-input); color: var(--fg); border: 1px solid var(--border);
+      border-radius: 2px; padding: 2px 4px; font-family: inherit; font-size: 11px;
+      width: 120px;
+    }
+    /* Admin meta text (channel info, file sizes, DM participants, bulletin body) */
+    .admin-meta { color: var(--fg-dim); font-size: 10px; }
+    /* Admin file list: indent directories */
+    .admin-panel .admin-row.is-dir {
+      padding-left: 16px;
+      color: var(--fg-dim);
+    }
+    /* Admin create row: flex layout for input + button */
+    .admin-create-row {
+      display: flex; gap: 4px; padding: 4px 0;
+    }
+    .admin-create-row input {
+      flex: 1;
+    }
+    /* Admin action buttons (create / delete / unban) */
+    .admin-action-btn {
+      background: var(--danger); color: #fff; border: 0; border-radius: 2px;
+      padding: 2px 6px; font-family: inherit; font-size: 10px; cursor: pointer;
+      white-space: nowrap;
+    }
+    .admin-action-btn:hover { opacity: 0.85; }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <header>
+      <span class="dot off" id="statusDot"></span>
+      <span class="title">COLD CIRCLE</span>
+      <span class="meta" id="connMeta">disconnected</span>
+      <span class="spacer"></span>
+      <span class="meta">online: <span id="onlineCount">0</span></span>
+      <span class="meta">you: <span id="selfHandle">—</span></span>
+    </header>
+    <main>
+      <div class="col chat">
+        <div class="pane-head">
+          <span class="label">#</span>
+          <input id="channel" value="#general" style="width:140px" spellcheck="false" />
+          <button id="joinChannel" style="background:var(--bg-input);color:var(--fg);border:1px solid var(--border)">join</button>
+          <span class="window" id="windowLabel">window: —</span>
+        </div>
+        <div id="messages"></div>
+        <div class="composer">
+          <input id="composer" type="text" placeholder="not connected" disabled spellcheck="false" />
+          <button id="sendBtn" disabled>send</button>
+        </div>
+      </div>
+      <div class="col side">
+        <div class="section presence-section">
+          <div class="pane-head"><span class="label"># presence</span></div>
+          <div class="presence" id="presence"><div class="handle" style="color:var(--fg-dim);cursor:default">—</div></div>
+        </div>
+        <div class="section dm-section">
+          <div class="pane-head"><span class="label"># direct messages</span></div>
+          <div class="dm-list" id="dmList"><div class="dm-empty">—</div></div>
+        </div>
+        <div class="section file-section">
+          <div class="pane-head">
+            <span class="label">📁 files</span>
+            <button class="refresh-btn" id="refreshFiles" title="refresh file list">↻</button>
+          </div>
+          <div class="file-list" id="fileList"><div class="file-empty">—</div></div>
+          <div class="file-progress" id="fileProgress"></div>
+          <div class="file-upload-area">
+            <button id="uploadBtn" disabled>upload file</button>
+            <input type="file" id="filePicker" style="display:none" />
+          </div>
+        </div>
+        <div class="section bulletin-section">
+          <div class="pane-head"><span class="label">📢 bulletin board</span></div>
+          <div class="bulletin-list" id="bulletinList"><div class="bulletin-empty">—</div></div>
+          <div class="bulletin-input-row">
+            <input type="text" id="bulletinInput" placeholder="post to bulletin..." maxlength="32768" />
+            <button id="bulletinSend" disabled>post</button>
+          </div>
+        </div>
+        <!-- Admin panel (visible only when role === "admin") -->
+        <div class="section admin-section" id="adminSection" style="display:none">
+          <div class="pane-head">
+            <span class="label">🔧 admin</span>
+            <button class="admin-toggle" id="adminToggle" title="toggle admin panel">▼</button>
+          </div>
+          <div id="adminContent" style="display:none">
+            <div class="admin-tabs">
+              <button class="admin-tab active" data-tab="serverInfo">Server</button>
+              <button class="admin-tab" data-tab="channels">Channels</button>
+              <button class="admin-tab" data-tab="files">Files</button>
+              <button class="admin-tab" data-tab="dmAudit">DM Audit</button>
+              <button class="admin-tab" data-tab="bulletin">Bulletin</button>
+              <button class="admin-tab" data-tab="bans">Bans</button>
+            </div>
+            <div class="admin-tab-content" id="adminBody">
+              <div class="admin-panel" id="panel_serverInfo"><div class="admin-empty">—</div></div>
+              <div class="admin-panel" id="panel_channels" style="display:none"><div class="admin-empty">—</div></div>
+              <div class="admin-panel" id="panel_files" style="display:none"><div class="admin-empty">—</div></div>
+              <div class="admin-panel" id="panel_dmAudit" style="display:none"><div class="admin-empty">—</div></div>
+              <div class="admin-panel" id="panel_bulletin" style="display:none"><div class="admin-empty">—</div></div>
+              <div class="admin-panel" id="panel_bans" style="display:none"><div class="admin-empty">—</div></div>
+            </div>
+          </div>
+        </div>
+        <div class="notice">
+          <strong>public chat</strong> is kept in an in-memory ring buffer and purged after the
+          retention window. <strong>DMs</strong> are persisted on the server and shown in the
+          right panel — click any online handle in the presence list to start a conversation.
+          <strong>Bulletin</strong> posts appear in the board above and are visible to all connected.
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <div id="connect">
+    <div class="card">
+      <h1>COLD CIRCLE</h1>
+      <p>Enter the passphrase to connect. Your passphrase is never stored on disk or in
+      localStorage — re-entered each page load.</p>
+      <label for="url">server</label>
+      <input id="url" value="ws://127.0.0.1:8443" spellcheck="false" />
+      <label for="handle">handle</label>
+      <input id="handle" placeholder="ghost_77" spellcheck="false" maxlength="32" />
+      <label for="passphrase">passphrase</label>
+      <input id="passphrase" type="password" placeholder="••••••••" />
+      <button id="connectBtn">enter</button>
+      <button id="disconnectBtn" style="background:var(--danger);color:#fff;margin-top:8px;display:none">disconnect</button>
+    </div>
+  </div>
+
+  <div id="toasts"></div>
+
+  <!-- Client logic injected below. -->
+  <script>
+    /* ---- Cold Circle client (Phase 0–1: skeleton + public chat) ---- */
+    "use strict";
+
+    // --- DOM refs ------------------------------------------------------------
+    const $ = (id) => document.getElementById(id);
+    const els = {
+      statusDot: $("statusDot"),
+      connMeta: $("connMeta"),
+      onlineCount: $("onlineCount"),
+      selfHandle: $("selfHandle"),
+      channel: $("channel"),
+      joinChannel: $("joinChannel"),
+      windowLabel: $("windowLabel"),
+      messages: $("messages"),
+      composer: $("composer"),
+      sendBtn: $("sendBtn"),
+      presence: $("presence"),
+      dmList: $("dmList"),
+      connect: $("connect"),
+      connectBtn: $("connectBtn"),
+      url: $("url"),
+      handle: $("handle"),
+      passphrase: $("passphrase"),
+      toasts: $("toasts"),
+      disconnectBtn: $("disconnectBtn"),
+      // File browser
+      fileList: $("fileList"),
+      fileProgress: $("fileProgress"),
+      uploadBtn: $("uploadBtn"),
+      filePicker: $("filePicker"),
+      refreshFiles: $("refreshFiles"),
+      // Bulletin board
+      bulletinList: $("bulletinList"),
+      bulletinInput: $("bulletinInput"),
+      bulletinSend: $("bulletinSend"),
+      // Admin panel
+      adminSection: $("adminSection"),
+      adminToggle: $("adminToggle"),
+      adminContent: $("adminContent"),
+      adminBody: $("adminBody"),
+      panel_serverInfo: $("panel_serverInfo"),
+      panel_channels: $("panel_channels"),
+      panel_files: $("panel_files"),
+      panel_dmAudit: $("panel_dmAudit"),
+      panel_bulletin: $("panel_bulletin"),
+      panel_bans: $("panel_bans"),
+    };
+
+    // --- State ---------------------------------------------------------------
+    let ws = null;
+    let session = null;
+    let selfHandle = null;
+    let isAdmin = false;
+    let currentChannel = "#general";
+    let retentionSec = 0;
+    let pingTimer = null;
+    // Passphrase is kept in memory only for transient reconnects; it is never
+    // written to localStorage or the DOM in plaintext.
+    let lastPassphrase = "";
+    const presence = new Set();
+
+    // File browser state
+    let uploading = false;       // true while an upload is in progress
+    let currentUploadId = null;  // server-assigned upload ID for chunk streaming
+    let pendingFile = null;      // File object saved until file_start_ok arrives
+    const CHUNK_SIZE = 64 * 1024; // 64 KB chunks
+
+    // Open DM conversations, keyed by the other party's handle. Each entry:
+    //   { handle, convId, online, keepLocal, messages: [{from,body,ts}], refs }
+    // The server never stores a DM; "keep locally" persists it to localStorage
+    // under the conv_id at the user's explicit choice (spec §3.4.2 / §4.3).
+    const conversations = new Map();
+    const DM_STORE_PREFIX = "cc.dm.";
+
+    // Cache only the handle and server URL across reloads (spec §4.5).
+    try {
+      const h = localStorage.getItem("cc.handle");
+      const u = localStorage.getItem("cc.url");
+      if (h) els.handle.value = h;
+      if (u) els.url.value = u;
+    } catch (_) { /* localStorage may be unavailable */ }
+
+    // --- Helpers -------------------------------------------------------------
+    function toast(msg, kind) {
+      const t = document.createElement("div");
+      t.className = "toast" + (kind === "warn" ? " warn" : "") + (kind === "info" ? " info" : "");
+      t.textContent = msg;
+      els.toasts.appendChild(t);
+      setTimeout(() => t.remove(), 4000);
+    }
+
+    function fmtTime(ts) {
+      const d = new Date(ts);
+      return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    }
+
+    function fmtWindow(sec) {
+      if (!sec || sec <= 0) return "window: permanent";
+      const m = sec / 60;
+      if (m < 1) return "window: " + sec + "s";
+      if (m < 60) return "window: " + m + " min";
+      const h = Math.floor(m / 60);
+      return "window: " + h + "h" + (m % 60 ? " " + Math.round(m % 60) + "m" : "");
+    }
+
+    // --- Rendering -----------------------------------------------------------
+    function appendMessage(m) {
+      const isSelf = m.handle === selfHandle;
+      const el = document.createElement("div");
+      el.className = "msg" + (isSelf ? " self" : "");
+      const who = document.createElement("span");
+      who.className = "who";
+      who.textContent = m.handle + ": ";
+      const ts = document.createElement("span");
+      ts.className = "ts";
+      ts.textContent = "[" + fmtTime(m.ts) + "] ";
+      const body = document.createElement("span");
+      body.className = "body";
+      body.textContent = m.body; // textContent escapes automatically
+      el.append(who, ts, body);
+      els.messages.appendChild(el);
+      scrollIfNearBottom();
+    }
+
+    function appendSystem(text) {
+      const el = document.createElement("div");
+      el.className = "msg system";
+      el.textContent = text;
+      els.messages.appendChild(el);
+    }
+
+    // Keep the transcript pinned to the newest message unless the user scrolled up.
+    let nearBottom = true;
+    els.messages.addEventListener("scroll", () => {
+      const near =
+        els.messages.scrollHeight - els.messages.scrollTop - els.messages.clientHeight < 60;
+      nearBottom = near;
+    });
+    function scrollIfNearBottom() {
+      if (nearBottom) els.messages.scrollTop = els.messages.scrollHeight;
+    }
+
+    function renderPresence() {
+      els.presence.textContent = "";
+      if (presence.size === 0) {
+        els.presence.textContent = "—";
+      } else {
+        for (const h of [...presence].sort()) {
+          const el = document.createElement("div");
+          el.className = "handle";
+          el.innerHTML = '<span class="dot on"></span>';
+          el.appendChild(document.createTextNode(h));
+          el.title = "start a direct message with " + h;
+          el.addEventListener("click", () => startDM(h));
+          els.presence.appendChild(el);
+        }
+      }
+      els.onlineCount.textContent = String(presence.size);
+    }
+
+    function setConnected(state) {
+      if (state === "connected") {
+        els.statusDot.className = "dot on";
+        els.connMeta.textContent = "connected to " + els.url.value;
+        els.composer.disabled = false;
+        els.composer.placeholder = "message " + currentChannel;
+        els.sendBtn.disabled = false;
+        setFileUIEnabled(true);
+        // Enable bulletin UI.
+        els.bulletinSend.disabled = false;
+        els.bulletinInput.disabled = false;
+        // Refresh the bulletin list.
+        refreshBulletin();
+        // Show admin panel if connected as admin.
+        if (isAdmin) {
+          els.adminSection.style.display = "";
+          refreshAdminServerInfo();
+        } else {
+          els.adminSection.style.display = "none";
+        }
+        // Re-enable DM inputs for conversations whose peer is online.
+        for (const c of conversations.values()) setDMInputEnabled(c, presence.has(c.handle));
+      } else {
+        els.statusDot.className = "dot off";
+        els.connMeta.textContent = "disconnected";
+        els.composer.disabled = true;
+        els.composer.placeholder = "not connected";
+        els.sendBtn.disabled = true;
+        setFileUIEnabled(false);
+        // Disable bulletin UI.
+        els.bulletinSend.disabled = true;
+        els.bulletinInput.disabled = true;
+        // Disable admin UI when disconnected.
+            const tabs = els.adminContent.querySelectorAll(".admin-tab");
+        for (let i = 0; i < tabs.length; i++) {
+          const tab = tabs[i];
+          tab.disabled = true;
+        }
+        // Disconnected: no DM inputs may be used.
+        for (const c of conversations.values()) setDMInputEnabled(c, false);
+        renderDMList();
+      }
+    }
+
+    // --- WebSocket protocol --------------------------------------------------
+    function send(obj) {
+      if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(obj));
+    }
+
+    function handleFrame(frame) {
+      switch (frame.op) {
+        case "auth_ok":
+          session = frame.session;
+          selfHandle = frame.handle ?? null;
+          retentionSec = frame.retention_sec ?? 0;
+          isAdmin = (frame.role === "admin");
+          els.selfHandle.textContent = selfHandle || "—";
+          els.windowLabel.textContent = fmtWindow(retentionSec);
+          els.connect.classList.add("hidden");
+          // Cancel any pending reconnect — we are now connected.
+          cancelReconnect();
+          setConnected("connected");
+          startPing();
+          // Pull the current retention window of the active channel, then seed
+          // presence from the server's health endpoint.
+          send({ op: "chat_history", channel: currentChannel, limit: 500, session });
+          seedPresence();
+          // Load the file list.
+          refreshFiles();
+          // Load the bulletin list.
+          refreshBulletin();
+          // Admin: refresh admin data.
+          if (frame.role === "admin") {
+            refreshAdminChannels();
+            refreshAdminFiles();
+            refreshAdminDMAudit();
+            refreshAdminBulletin();
+            refreshAdminBans();
+          }
+          // Load any locally-stored DM conversations.
+          loadLocalDMs();
+          break;
+        case "auth_fail":
+          toast("auth failed: " + frame.reason, "warn");
+          setConnected("disconnected");
+          showConnectOverlay();
+          break;
+        case "chat_msg":
+          if (frame.channel !== currentChannel) {
+            appendSystem("(" + frame.handle + " in " + frame.channel + ") " + frame.body);
+          } else {
+            appendMessage(frame);
+          }
+          break;
+        case "chat_history":
+          // Server sends newest-first; reverse for bottom-anchored display.
+          els.messages.textContent = "";
+          for (const m of frame.messages.slice().reverse()) appendMessage(m);
+          els.messages.scrollTop = els.messages.scrollHeight;
+          break;
+        case "user_join":
+          presence.add(frame.handle);
+          renderPresence();
+          appendSystem(frame.handle + " joined");
+          break;
+        case "user_leave":
+          presence.delete(frame.handle);
+          renderPresence();
+          appendSystem(frame.handle + " left");
+          break;
+        case "pong":
+          break;
+        case "dm_recv":
+          // A DM arrived from someone else (or was relayed to us).
+          handleDMRecv(frame);
+          break;
+        case "dm_history":
+          // Server responded with stored DM history.
+          handleDMHistory(frame);
+          break;
+        case "dm_pending":
+          // Server is telling us we have unread DMs for these conv_ids.
+          // Fetch history for each one.
+          for (const convId of (frame.conv_ids || [])) {
+            send({ op: "dm_history", conv_id: convId, limit: 500, session });
+          }
+          break;
+        case "dm_norecipient":
+          // Target is not connected — DM was stored but not delivered.
+          toast(frame.to + " is not online — DM stored for later delivery", "info");
+          break;
+        case "file_list":
+          renderFileList(frame.entries || []);
+          break;
+        case "file_start_ok":
+          // Server accepted the upload start — begin streaming chunks.
+          const fileToUpload = pendingFile;
+          if (fileToUpload && frame.upload_id) {
+            pendingFile = null;          // clear so we don't re-use a stale File
+            startChunkStreaming(fileToUpload, frame.upload_id);
+          }
+          break;
+        case "file_download":
+          handleFileDownload(frame);
+          break;
+        case "bulletin_entry":
+          // New bulletin post broadcast — append to the list.
+          refreshBulletin();
+          break;
+        case "bulletin_list":
+          renderBulletinList(frame.entries || []);
+          // Also refresh admin bulletin panel when admin is connected.
+          if (els.adminSection.style.display !== "none") {
+            refreshAdminBulletin();
+          }
+          break;
+        case "error":
+          toast(frame.message || "server error", "warn");
+          // If an upload error occurred, clean up the pending file.
+          if (uploading && frame.code === "upload_failed") {
+            uploading = false;
+            pendingFile = null;
+            currentUploadId = null;
+            setFileUIEnabled(true);
+            setFileProgress("");
+          }
+          break;
+        // --- Admin frame handlers (Phase 5) ---
+        case "admin_server_info":
+          handleAdminServerInfo(frame);
+          break;
+        case "admin_channel_list":
+          handleAdminChannelList(frame);
+          break;
+        case "admin_file_list":
+          handleAdminFileList(frame);
+          break;
+        case "admin_dm_audit":
+          handleAdminDMAudit(frame);
+          break;
+        case "admin_bulletin_list":
+          handleAdminBulletinList(frame);
+          break;
+        case "admin_banned_list":
+          handleAdminBannedList(frame);
+          break;
+        case "admin_ban":
+          handleAdminBan(frame);
+          break;
+        case "admin_unban":
+          handleAdminUnban(frame);
+          break;
+        case "admin_channel_set_retention":
+          // Server re-sends the channel list after retention change.
+          handleAdminChannelList(frame);
+          break;
+      }
+    }
+
+    function startPing() {
+      if (pingTimer) clearInterval(pingTimer);
+      pingTimer = setInterval(() => send({ op: "ping", session }), 25000);
+    }
+
+    function seedPresence() {
+      const httpUrl = els.url.value.replace(/^wss:/, "https:").replace(/^ws:/, "http:");
+      fetch(httpUrl + "/health")
+        .then((r) => r.json())
+        .then((j) => {
+          presence.clear();
+          for (const h of j.online || []) presence.add(h);
+          renderPresence();
+        })
+        .catch(() => { /* presence seeding is best-effort */ });
+    }
+
+    // --- Connect / disconnect ------------------------------------------------
+    function connect() {
+      const url = els.url.value.trim();
+      const handle = els.handle.value.trim();
+      const pass = els.passphrase.value;
+      if (!url || !handle) {
+        toast("enter a server URL and a handle", "warn");
+        return;
+      }
+      lastPassphrase = pass;
+      try {
+        localStorage.setItem("cc.handle", handle);
+        localStorage.setItem("cc.url", url);
+      } catch (_) { /* ignore */ }
+      currentChannel = (els.channel.value.trim() || "#general").replace(/^#?/, "#");
+      els.channel.value = currentChannel;
+      els.passphrase.value = ""; // clear the plaintext from the field after use
+
+      if (ws) { try { ws.close(); } catch (_) {} }
+      setConnected("connecting");
+      els.connMeta.textContent = "connecting to " + url;
+
+      ws = new WebSocket(url);
+      ws.onopen = () => {
+        send({ op: "auth", passphrase: lastPassphrase, handle });
+      };
+      ws.onmessage = (ev) => {
+        let frame;
+        try { frame = JSON.parse(ev.data); } catch (_) { return; }
+        handleFrame(frame);
+      };
+      ws.onclose = () => {
+        stopPing();
+        session = null;
+        setConnected("disconnected");
+        showConnectOverlay();
+        // Auto-reconnect if we have credentials and haven't been manually disconnected.
+        if (lastPassphrase && selfHandle) {
+          scheduleReconnect();
+        }
+      };
+      ws.onerror = () => {
+        toast("connection error", "warn");
+      };
+    }
+
+    function showConnectOverlay() {
+      els.connect.classList.remove("hidden");
+      // Show disconnect button when we have credentials but are not connected.
+      els.disconnectBtn.style.display = (lastPassphrase && selfHandle) ? "" : "none";
+      // Passphrase is intentionally left blank; if we still hold it in memory
+      // for a transient drop, reuse it on reconnect without showing it.
+    }
+
+    // Manual disconnect: clear passphrase so reconnect stops.
+    function disconnect() {
+      lastPassphrase = "";
+      cancelReconnect();
+      if (ws) { try { ws.close(); } catch (_) {} }
+      showConnectOverlay();
+    }
+
+    // --- Auto-reconnect ------------------------------------------------------
+    let reconnectTimer = null;
+    function scheduleReconnect() {
+      if (reconnectTimer) return; // already scheduled
+      const delay = Math.min(1000 * Math.pow(2, Math.floor(Math.random() * 3)), 30000);
+      console.log("[cold-circle] reconnect scheduled in " + (delay / 1000) + "s");
+      reconnectTimer = setTimeout(() => {
+        reconnectTimer = null;
+        connect();
+      }, delay);
+    }
+    function cancelReconnect() {
+      if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
+    }
+
+    // Load locally-stored DM conversations from localStorage.
+    function loadLocalDMs() {
+      try {
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key && key.startsWith(DM_STORE_PREFIX)) {
+            const convId = key.substring(DM_STORE_PREFIX.length);
+            const msgs = JSON.parse(localStorage.getItem(key) || "[]");
+            if (msgs.length === 0) continue;
+            const other = msgs[0].from === selfHandle ? msgs[0].to : msgs[0].from;
+            const existing = conversations.get(other);
+            if (!existing) {
+              const conv = {
+                handle: other,
+                convId,
+                online: presence.has(other),
+                keepLocal: true,
+                messages: msgs,
+              };
+              conversations.set(other, conv);
+            }
+          }
+        }
+      } catch (_) { /* ignore */ }
+      renderDMList();
+    }
+
+    function stopPing() {
+      if (pingTimer) { clearInterval(pingTimer); pingTimer = null; }
+    }
+
+    function sendMessage() {
+      const body = els.composer.value;
+      if (!body.trim()) return;
+      send({ op: "chat_send", channel: currentChannel, body, session });
+      els.composer.value = "";
+    }
+
+    function joinChannel() {
+      currentChannel = (els.channel.value.trim() || "#general").replace(/^#?/, "#");
+      els.channel.value = currentChannel;
+      els.composer.placeholder = "message " + currentChannel;
+      els.messages.textContent = "";
+      send({ op: "chat_history", channel: currentChannel, limit: 500, session });
+    }
+
+    // --- DM helpers ----------------------------------------------------------
+    // Start a DM conversation with a handle.  Creates (or reuses) a convId
+    // so both parties group the same conversation.
+    function startDM(targetHandle) {
+      if (targetHandle === selfHandle) {
+        toast("you can't DM yourself", "warn");
+        return;
+      }
+      // Check if we already have a conversation with this handle.
+      let conv = conversations.get(targetHandle);
+      if (!conv) {
+        const buf = new Uint8Array(4); crypto.getRandomValues(buf); const convId = "c_" + Array.from(buf).map(b => b.toString(16).padStart(2, "0")).join("");
+        conv = {
+          handle: targetHandle,
+          convId,
+          online: presence.has(targetHandle),
+          keepLocal: false,
+          messages: [],
+        };
+        conversations.set(targetHandle, conv);
+      }
+      conv.online = presence.has(targetHandle);
+      renderDMList();
+      // Fetch history for this conversation.
+      send({ op: "dm_history", conv_id: conv.convId, limit: 500, session });
+    }
+
+    // Handle a DM that arrived from the server (relay or stored history).
+    function handleDMRecv(frame) {
+      const other = frame.from === selfHandle ? frame.to : frame.from;
+      let conv = conversations.get(other);
+      if (!conv) {
+        // First time seeing this conversation — create it.
+        conv = {
+          handle: other,
+          convId: frame.conv_id,
+          online: presence.has(other),
+          keepLocal: false,
+          messages: [],
+        };
+        conversations.set(other, conv);
+      }
+      // Add the message.
+      conv.messages.push({ from: frame.from, to: frame.to, body: frame.body, conv_id: frame.conv_id, ts: frame.ts });
+      conv.online = presence.has(other);
+      renderDMList();
+    }
+
+    // Handle stored DM history from the server.
+    function handleDMHistory(frame) {
+      // Find the conversation by conv_id.
+      for (const conv of conversations.values()) {
+        if (conv.convId === frame.conv_id) {
+          // Replace existing messages with the server's history (oldest-first).
+          conv.messages = frame.messages;
+          renderDMList();
+          return;
+        }
+      }
+      // No existing conversation — create it from history.
+      const msgs = frame.messages;
+      if (msgs.length === 0) return;
+      const other = msgs[0].from === selfHandle ? msgs[0].to : msgs[0].from;
+      const conv = {
+        handle: other,
+        convId: frame.conv_id,
+        online: presence.has(other),
+        keepLocal: false,
+        messages: msgs,
+      };
+      conversations.set(other, conv);
+      renderDMList();
+    }
+
+    // Render the DM list in the side panel.
+    function renderDMList() {
+      els.dmList.textContent = "";
+      if (conversations.size === 0) {
+        els.dmList.innerHTML = '<div class="dm-empty">—</div>';
+        return;
+      }
+      // Sort by most recent message.
+      const sorted = [...conversations.values()].sort((a, b) => {
+        const aLast = a.messages.length ? a.messages[a.messages.length - 1].ts : 0;
+        const bLast = b.messages.length ? b.messages[b.messages.length - 1].ts : 0;
+        return bLast - aLast;
+      });
+      for (const conv of sorted) {
+        const el = document.createElement("div");
+        el.className = "dm";
+        // Header
+        const head = document.createElement("div");
+        head.className = "dm-head";
+        const title = document.createElement("span");
+        title.className = "dm-title";
+        title.textContent = conv.handle;
+        head.appendChild(title);
+        if (!conv.online) {
+          const badge = document.createElement("span");
+          badge.className = "dm-offline";
+          badge.textContent = "offline";
+          head.appendChild(badge);
+        } else {
+          const badge = document.createElement("span");
+          badge.className = "dm-badge";
+          badge.textContent = "online";
+          head.appendChild(badge);
+        }
+        const keep = document.createElement("span");
+        keep.className = "dm-keep";
+        const cb = document.createElement("input");
+        cb.type = "checkbox";
+        cb.checked = conv.keepLocal;
+        cb.addEventListener("change", () => {
+          conv.keepLocal = cb.checked;
+          if (conv.keepLocal) {
+            try { localStorage.setItem(DM_STORE_PREFIX + conv.convId, JSON.stringify(conv.messages)); } catch (_) { /* ignore */ }
+          } else {
+            try { localStorage.removeItem(DM_STORE_PREFIX + conv.convId); } catch (_) { /* ignore */ }
+          }
+        });
+        keep.appendChild(cb);
+        keep.appendChild(document.createTextNode("keep"));
+        keep.addEventListener("click", (e) => {
+          if (e.target.tagName !== "INPUT") {
+            cb.checked = !cb.checked;
+            cb.dispatchEvent(new Event("change"));
+          }
+        });
+        const close = document.createElement("button");
+        close.className = "dm-close";
+        close.textContent = "\u00d7";
+        close.addEventListener("click", () => {
+          conversations.delete(conv.handle);
+          renderDMList();
+        });
+        head.appendChild(keep);
+        head.appendChild(close);
+        el.appendChild(head);
+        // Body
+        const body = document.createElement("div");
+        body.className = "dm-body";
+        for (const m of conv.messages) {
+          const msgEl = document.createElement("div");
+          msgEl.className = "msg" + (m.from === selfHandle ? " self" : "");
+          const who = document.createElement("span");
+          who.className = "who";
+          who.textContent = m.from + ": ";
+          const ts = document.createElement("span");
+          ts.className = "ts";
+          ts.textContent = "[" + fmtTime(m.ts) + "] ";
+          const bodyText = document.createElement("span");
+          bodyText.className = "body";
+          bodyText.textContent = m.body;
+          msgEl.append(who, ts, bodyText);
+          body.appendChild(msgEl);
+        }
+        el.appendChild(body);
+        // Input row
+        const inputRow = document.createElement("div");
+        inputRow.className = "dm-input";
+        const input = document.createElement("input");
+        input.type = "text";
+        input.placeholder = "message " + conv.handle;
+        input.disabled = !presence.has(conv.handle);
+        input.spellcheck = false;
+        const send = document.createElement("button");
+        send.textContent = ">";
+        send.disabled = !presence.has(conv.handle);
+        send.addEventListener("click", () => {
+          const text = input.value.trim();
+          if (!text) return;
+          send({ op: "dm_send", to: conv.handle, body: text, conv_id: conv.convId, session });
+          input.value = "";
+        });
+        input.addEventListener("keydown", (e) => {
+          if (e.key === "Enter") send.click();
+        });
+        inputRow.appendChild(input);
+        inputRow.appendChild(send);
+        el.appendChild(inputRow);
+        els.dmList.appendChild(el);
+      }
+    }
+
+    function setDMInputEnabled(conv, enabled) {
+      conv.online = enabled;
+      renderDMList();
+    }
+
+    // --- File browser --------------------------------------------------------
+    function refreshFiles() {
+      if (!session) return;
+      send({ op: "file_list", session });
+    }
+
+    function renderFileList(entries) {
+      els.fileList.textContent = "";
+      if (!entries || entries.length === 0) {
+        els.fileList.innerHTML = '<div class="file-empty">—</div>';
+        return;
+      }
+      // Sort: directories first, then files alphabetically.
+      const sorted = [...entries].sort((a, b) => {
+        if (a.isDir !== b.isDir) return a.isDir ? -1 : 1;
+        return a.name.localeCompare(b.name);
+      });
+      for (const e of sorted) {
+        const el = document.createElement("div");
+        el.className = "file-entry";
+        const icon = document.createElement("span");
+        icon.className = "f-icon";
+        icon.textContent = e.isDir ? "📂" : "📄";
+        const name = document.createElement("span");
+        name.className = "f-name";
+        name.textContent = e.name;
+        const size = document.createElement("span");
+        size.className = "f-size";
+        size.textContent = e.isDir ? "" : fmtSize(e.size);
+        el.append(icon, name, size);
+        // Non-directory files get download and delete buttons.
+        if (!e.isDir) {
+          const actions = document.createElement("div");
+          actions.className = "f-actions";
+          const dlBtn = document.createElement("button");
+          dlBtn.textContent = "⬇";
+          dlBtn.title = "download " + e.name;
+          dlBtn.addEventListener("click", () => downloadFile(e.name));
+          const delBtn = document.createElement("button");
+          delBtn.className = "del";
+          delBtn.textContent = "✕";
+          delBtn.title = "delete " + e.name;
+          delBtn.addEventListener("click", () => deleteFile(e.name));
+          actions.append(dlBtn, delBtn);
+          el.appendChild(actions);
+        }
+        els.fileList.appendChild(el);
+      }
+    }
+
+    function fmtSize(bytes) {
+      if (bytes < 1024) return bytes + " B";
+      if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+      return (bytes / (1024 * 1024)).toFixed(1) + " MB";
+    }
+
+    function setFileUIEnabled(enabled) {
+      els.uploadBtn.disabled = !enabled;
+      if (!enabled) {
+        setFileProgress("");
+        uploading = false;
+        currentUploadId = null;
+      }
+    }
+
+    function setFileProgress(msg) {
+      els.fileProgress.textContent = msg;
+    }
+
+    // Upload a file: start → stream chunks → finalize.
+    function uploadFile(file) {
+      if (uploading) {
+        toast("upload already in progress", "warn");
+        return;
+      }
+      uploading = true;
+      pendingFile = file;            // save so file_start_ok handler can find it
+      setFileUIEnabled(false);
+      setFileProgress("uploading: " + file.name);
+      // Phase 1: start
+      send({
+        op: "file_upload",
+        action: "start",
+        name: file.name,
+        size: file.size,
+        session,
+      });
+    }
+
+    // Handle the file_start_ok response and begin streaming chunks.
+    function startChunkStreaming(file, uploadId) {
+      currentUploadId = uploadId;
+      let offset = 0;
+      function sendNextChunk() {
+        if (offset >= file.size) {
+          // All chunks sent — finalize.
+          send({ op: "file_upload", action: "finalize", upload_id: uploadId, session });
+          setFileProgress("upload complete: " + file.name);
+          setTimeout(() => {
+            setFileProgress("");
+            uploading = false;
+            currentUploadId = null;
+            refreshFiles();
+          }, 2000);
+          return;
+        }
+        const slice = file.slice(offset, offset + CHUNK_SIZE);
+        const reader = new FileReader();
+        reader.onload = () => {
+          send({ op: "file_upload", action: "chunk", data: Array.from(new Uint8Array(reader.result)), upload_id: uploadId, session });
+          offset += CHUNK_SIZE;
+          const pct = Math.min(100, Math.round((offset / file.size) * 100));
+          setFileProgress("uploading: " + file.name + " (" + pct + "%)");
+          // Continue streaming (non-blocking for small files).
+          setTimeout(sendNextChunk, 0);
+        };
+        reader.readAsArrayBuffer(slice);
+      }
+      sendNextChunk();
+    }
+
+    // Download a file: request → receive base64 → save as file.
+    function downloadFile(name) {
+      if (!session) return;
+      setFileProgress("downloading: " + name);
+      send({ op: "file_download", name, session });
+    }
+
+    function handleFileDownload(frame) {
+      try {
+        const base64 = frame.data || "";
+        const binary = atob(base64);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) {
+          bytes[i] = binary.charCodeAt(i);
+        }
+        // Create a download link.
+        const blob = new Blob([bytes], { type: "application/octet-stream" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = frame.name;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        setFileProgress("downloaded: " + frame.name);
+        setTimeout(() => {
+          setFileProgress("");
+          refreshFiles();
+        }, 2000);
+      } catch (err) {
+        toast("download failed: " + String(err), "warn");
+        setFileProgress("");
+      }
+    }
+
+    // Delete a file.
+    function deleteFile(name) {
+      if (!session) return;
+      if (!confirm("Delete " + name + "?")) return;
+      send({ op: "file_delete", name, session });
+    }
+
+    // --- Bulletin board ------------------------------------------------------
+    function postBulletin(body) {
+      if (!session || !body.trim()) return;
+      send({ op: "bulletin_post", body: body.trim(), session });
+      els.bulletinInput.value = "";
+    }
+
+    function renderBulletinList(entries) {
+      els.bulletinList.innerHTML = "";
+      if (!entries || entries.length === 0) {
+        els.bulletinList.innerHTML = '<div class="bulletin-empty">—</div>';
+        return;
+      }
+      for (const e of entries) {
+        const el = document.createElement("div");
+        el.className = "bulletin-entry";
+        const handleSpan = document.createElement("span");
+        handleSpan.className = "b-handle";
+        handleSpan.textContent = e.handle;
+        const bodySpan = document.createElement("div");
+        bodySpan.className = "b-body";
+        bodySpan.textContent = e.body;
+        const tsSpan = document.createElement("span");
+        tsSpan.className = "b-ts";
+        tsSpan.textContent = new Date(e.ts).toLocaleTimeString();
+        el.appendChild(handleSpan);
+        el.appendChild(bodySpan);
+        el.appendChild(tsSpan);
+        els.bulletinList.appendChild(el);
+      }
+      // Scroll to bottom (newest on top, so scroll to top).
+      els.bulletinList.scrollTop = 0;
+    }
+
+    function refreshBulletin() {
+      if (!session) return;
+      send({ op: "bulletin_list", session });
+    }
+
+    // --- Admin panel ---------------------------------------------------------
+    let adminTabActive = "serverInfo";
+
+    // Toggle the admin panel collapse.
+    els.adminToggle.addEventListener("click", () => {
+      const showing = els.adminContent.style.display !== "none";
+      els.adminContent.style.display = showing ? "none" : "";
+      els.adminToggle.textContent = showing ? "▼" : "▲";
+    });
+
+    // Tab switching.
+    const adminTabs = els.adminContent.querySelectorAll(".admin-tab");
+    for (let i = 0; i < adminTabs.length; i++) {
+      const tab = adminTabs[i];
+      tab.addEventListener("click", () => {
+        // Update active tab button.
+        const adminTabs2 = els.adminContent.querySelectorAll(".admin-tab");
+        for (let j = 0; j < adminTabs2.length; j++) {
+          adminTabs2[j].classList.remove("active");
+        }
+        tab.classList.add("active");
+        adminTabActive = tab.getAttribute("data-tab");
+        // Show corresponding panel.
+        const panels = els.adminContent.querySelectorAll(".admin-panel");
+        for (let i = 0; i < panels.length; i++) {
+          const p = panels[i];
+          p.style.display = (p.id === "panel_" + adminTabActive) ? "" : "none";
+        }
+        // Refresh the active tab's data.
+        switch (adminTabActive) {
+          case "serverInfo": refreshAdminServerInfo(); break;
+          case "channels": refreshAdminChannels(); break;
+          case "files": refreshAdminFiles(); break;
+          case "dmAudit": refreshAdminDMAudit(); break;
+          case "bulletin": refreshAdminBulletin(); break;
+          case "bans": refreshAdminBans(); break;
+        }
+      });
+    }
+
+    function adminSend(frame) {
+      if (!session) return;
+      send(Object.assign(frame, { session, _admin: true }));
+    }
+
+    // --- Server info ---
+    function refreshAdminServerInfo() {
+      adminSend({ op: "admin_server_info" });
+    }
+
+    function handleAdminServerInfo(frame) {
+      const body = els.panel_serverInfo;
+      body.textContent = "";
+      // Server sends: version, uptime_ms, online_handles, online_count,
+      // channel_count, channels, total_sessions, file_count,
+      // file_disk_usage, bulletin_count, dm_conversations.
+      const lines = [
+        "version: " + (frame.version || "—"),
+        "uptime: " + formatUptime(Math.floor(frame.uptime_ms / 1000)),
+        "online handles: " + (frame.online_handles ? frame.online_handles.join(", ") : "—"),
+        "channels: " + (frame.channel_count ?? "—") + " / 100",
+        "sessions: " + (frame.total_sessions ?? "—"),
+        "files: " + (frame.file_count ?? "—"),
+        "bulletin posts: " + (frame.bulletin_count ?? "—"),
+        "DM conversations: " + (frame.dm_conversations ?? "—"),
+      ];
+      for (const line of lines) {
+        const div = document.createElement("div");
+        div.className = "admin-row";
+        div.textContent = line;
+        body.appendChild(div);
+      }
+    }
+
+    // --- Channels ---
+    function refreshAdminChannels() {
+      adminSend({ op: "admin_channel_list" });
+    }
+
+    function handleAdminChannelList(frame) {
+      const body = els.panel_channels;
+      body.textContent = "";
+      const chs = frame.channels || [];
+      if (chs.length === 0) {
+        body.innerHTML = '<div class="admin-empty">—</div>';
+        return;
+      }
+      // Create channel input row.
+      const createRow = document.createElement("div");
+      createRow.className = "admin-create-row";
+      const nameInput = document.createElement("input");
+      nameInput.type = "text";
+      nameInput.id = "adminChannelName";
+      nameInput.placeholder = "new channel name";
+      nameInput.maxLength = 64;
+      const createBtn = document.createElement("button");
+      createBtn.textContent = "create channel";
+      createBtn.className = "admin-action-btn";
+      createBtn.addEventListener("click", () => {
+        const name = nameInput.value.trim();
+        if (!name) return;
+        adminSend({ op: "admin_channel_create", channel: name });
+        nameInput.value = "";
+      });
+      createRow.appendChild(nameInput);
+      createRow.appendChild(createBtn);
+      body.appendChild(createRow);
+      // Channel list.
+      for (const ch of chs) {
+        const row = document.createElement("div");
+        row.className = "admin-row";
+        const nameSpan = document.createElement("span");
+        nameSpan.textContent = ch.name;
+        const infoSpan = document.createElement("span");
+        infoSpan.className = "admin-meta";
+        infoSpan.textContent = (ch.message_count || 0) + " msgs" + (ch.retention_sec ? " | " + formatUptime(ch.retention_sec) : " | permanent");
+        // Retention edit: inline input + apply button.
+        const retInput = document.createElement("input");
+        retInput.type = "number";
+        retInput.className = "admin-input";
+        retInput.placeholder = "sec";
+        retInput.min = "0";
+        retInput.value = ch.retention_sec ? String(ch.retention_sec) : "";
+        retInput.title = "retention in seconds (0 = permanent)";
+        const retApplyBtn = document.createElement("button");
+        retApplyBtn.textContent = "set";
+        retApplyBtn.className = "admin-action-btn";
+        retApplyBtn.title = "apply retention";
+        retApplyBtn.addEventListener("click", () => {
+          const val = parseInt(retInput.value, 10);
+          if (isNaN(val) || val < 0) {
+            toast("invalid retention value", "warn");
+            return;
+          }
+          adminSend({ op: "admin_channel_set_retention", channel: ch.name, retention_sec: val });
+        });
+        // Delete button.
+        const delBtn = document.createElement("button");
+        delBtn.textContent = "delete";
+        delBtn.className = "admin-action-btn";
+        delBtn.title = "delete channel";
+        delBtn.addEventListener("click", () => {
+          if (confirm("Delete channel '" + ch.name + "'? All messages will be lost.")) {
+            adminSend({ op: "admin_channel_delete", channel: ch.name });
+            refreshAdminChannels();
+          }
+        });
+        row.appendChild(nameSpan);
+        row.appendChild(infoSpan);
+        row.appendChild(retInput);
+        row.appendChild(retApplyBtn);
+        row.appendChild(delBtn);
+        body.appendChild(row);
+      }
+    }
+    // --- Files ---
+    function refreshAdminFiles() {
+      adminSend({ op: "admin_file_list" });
+    }
+
+    function handleAdminFileList(frame) {
+      const body = els.panel_files;
+      body.textContent = "";
+      const entries = frame.files || [];
+      if (entries.length === 0) {
+        body.innerHTML = '<div class="admin-empty">—</div>';
+        return;
+      }
+      for (const f of entries) {
+        const row = document.createElement("div");
+        row.className = "admin-row" + (f.isDir ? " is-dir" : "");
+        const nameSpan = document.createElement("span");
+        nameSpan.textContent = (f.isDir ? "📁 " : "📄 ") + f.name;
+        const metaSpan = document.createElement("span");
+        metaSpan.className = "admin-meta";
+        metaSpan.textContent = (f.size || 0) + " bytes" + (f.uploader ? " | by " + f.uploader : "");
+        row.appendChild(nameSpan);
+        row.appendChild(metaSpan);
+        body.appendChild(row);
+      }
+    }
+
+    // --- DM Audit ---
+    function refreshAdminDMAudit() {
+      adminSend({ op: "admin_dm_audit" });
+    }
+
+    function handleAdminDMAudit(frame) {
+      const body = els.panel_dmAudit;
+      body.textContent = "";
+      const convs = frame.conversations || [];
+      if (convs.length === 0) {
+        body.innerHTML = '<div class="admin-empty">—</div>';
+        return;
+      }
+      for (const c of convs) {
+        const row = document.createElement("div");
+        row.className = "admin-row";
+        const idSpan = document.createElement("span");
+        idSpan.textContent = c.convId;
+        const metaSpan = document.createElement("span");
+        metaSpan.className = "admin-meta";
+        const msgs = c.messages || [];
+        // Derive participants from messages.
+        const handles = new Set();
+        for (const m of msgs) { handles.add(m.from); handles.add(m.to); }
+        metaSpan.textContent = [...handles].sort().join(", ") + " | " + msgs.length + " msgs";
+        row.appendChild(idSpan);
+        row.appendChild(metaSpan);
+        body.appendChild(row);
+      }
+    }
+
+    // --- Bulletin (admin delete) ---
+    function refreshAdminBulletin() {
+      adminSend({ op: "admin_bulletin_list" });
+    }
+
+    function handleAdminBulletinList(frame) {
+      const body = els.panel_bulletin;
+      body.textContent = "";
+      const posts = frame.posts || [];
+      if (posts.length === 0) {
+        body.innerHTML = '<div class="admin-empty">—</div>';
+        return;
+      }
+      for (const p of posts) {
+        const row = document.createElement("div");
+        row.className = "admin-row";
+        const handleSpan = document.createElement("span");
+        handleSpan.textContent = p.handle;
+        const bodySpan = document.createElement("span");
+        bodySpan.className = "admin-meta";
+        bodySpan.textContent = p.body ? (p.body.substring(0, 60) + (p.body.length > 60 ? "…" : "")) : "";
+        const tsSpan = document.createElement("span");
+        tsSpan.className = "admin-meta";
+        tsSpan.textContent = new Date(p.ts).toLocaleString();
+        const delBtn = document.createElement("button");
+        delBtn.textContent = "delete";
+        delBtn.className = "admin-action-btn";
+        delBtn.addEventListener("click", () => {
+          if (confirm("Delete bulletin post by " + p.handle + "?")) {
+            adminSend({ op: "admin_bulletin_delete", post_id: p.bulletin_id });
+            refreshAdminBulletin();
+          }
+        });
+        row.appendChild(handleSpan);
+        row.appendChild(bodySpan);
+        row.appendChild(tsSpan);
+        row.appendChild(delBtn);
+        body.appendChild(row);
+      }
+    }
+
+    // --- Bans ---
+    function refreshAdminBans() {
+      adminSend({ op: "admin_banned_list" });
+    }
+
+    function handleAdminBannedList(frame) {
+      const body = els.panel_bans;
+      body.textContent = "";
+      const handles = frame.handles || [];
+      // Ban input row.
+      const banRow = document.createElement("div");
+      banRow.className = "admin-create-row";
+      const handleInput = document.createElement("input");
+      handleInput.type = "text";
+      handleInput.id = "adminBanHandle";
+      handleInput.placeholder = "handle to ban";
+      handleInput.maxLength = 32;
+      const banBtn = document.createElement("button");
+      banBtn.textContent = "ban";
+      banBtn.className = "admin-action-btn";
+      banBtn.addEventListener("click", () => {
+        const h = handleInput.value.trim();
+        if (!h) return;
+        adminSend({ op: "admin_ban", handle: h });
+        handleInput.value = "";
+      });
+      banRow.appendChild(handleInput);
+      banRow.appendChild(banBtn);
+      body.appendChild(banRow);
+      if (handles.length === 0) {
+        body.appendChild(document.createElement("div"));
+        if (body.lastChild) {
+          (body.lastChild).className = "admin-empty";
+          (body.lastChild).textContent = "— no banned handles";
+        }
+        return;
+      }
+      for (const h of handles) {
+        const row = document.createElement("div");
+        row.className = "admin-row";
+        const handleSpan = document.createElement("span");
+        handleSpan.textContent = h;
+        const unbanBtn = document.createElement("button");
+        unbanBtn.textContent = "unban";
+        unbanBtn.className = "admin-action-btn";
+        unbanBtn.addEventListener("click", () => {
+          adminSend({ op: "admin_unban", handle: h });
+          refreshAdminBans();
+        });
+        row.appendChild(handleSpan);
+        row.appendChild(unbanBtn);
+        body.appendChild(row);
+      }
+    }
+    // Called when the server re-sends the banned list after a ban/unban.
+    function handleAdminBan(frame) {
+      refreshAdminBans();
+    }
+    function handleAdminUnban(frame) {
+      refreshAdminBans();
+    }
+    function formatUptime(sec) {
+      if (!sec || sec <= 0) return "0s";
+      const h = Math.floor(sec / 3600);
+      const m = Math.floor((sec % 3600) / 60);
+      const s = sec % 60;
+      const parts = [];
+      if (h > 0) parts.push(h + "h");
+      if (m > 0) parts.push(m + "m");
+      if (s > 0 || parts.length === 0) parts.push(s + "s");
+      return parts.join(" ");
+    }
+
+
+    // --- Wire up the UI ------------------------------------------------------
+    els.connectBtn.addEventListener("click", connect);
+    els.disconnectBtn.addEventListener("click", disconnect);
+    els.passphrase.addEventListener("keydown", (e) => { if (e.key === "Enter") connect(); });
+    els.sendBtn.addEventListener("click", sendMessage);
+    els.composer.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") { e.preventDefault(); console.log("[cold-circle] Enter pressed, sending:", els.composer.value.trim()); sendMessage(); }
+      });
+    els.joinChannel.addEventListener("click", joinChannel);
+    els.channel.addEventListener("keydown", (e) => { if (e.key === "Enter") joinChannel(); });
+    els.refreshFiles.addEventListener("click", refreshFiles);
+    els.uploadBtn.addEventListener("click", () => { els.filePicker.click(); });
+    els.filePicker.addEventListener("change", (e) => {
+      const file = (e.target).files?.[0];
+      if (file) uploadFile(file);
+      // Reset so the same file can be selected again.
+      (e.target).value = "";
+    });
+    els.bulletinSend.addEventListener("click", () => {
+      postBulletin(els.bulletinInput.value);
+    });
+    els.bulletinInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        postBulletin(els.bulletinInput.value);
+      }
+    });
+    // --- Admin panel event listeners ---
+    // Admin panel is hidden by default; shown only when role === "admin".
+    els.adminSection.style.display = "none";
+  </script>
+</body>
+</html>

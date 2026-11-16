@@ -1,0 +1,35 @@
+# Cold Circle server configuration.
+# Copy to `coldcircle.config.yaml` and change the passphrases before exposing
+# this server to any network. The default passphrases below are placeholders.
+
+server:
+  bind: "0.0.0.0"        # host to listen on
+  port: 8443             # ws + http port (use TLS for production, see tls:)
+  passphrase: "abacus"   # shared auth; every user needs this
+  admin_passphrase: "abacus_admin"   # separate; gates admin ops
+  # Optional TLS. When both are set, the server serves https + wss instead.
+  # tls:
+  #   cert: "/etc/coldcircle/cert.pem"
+  #   key: "/etc/coldcircle/key.pem"
+
+chat:
+  default_channel: "#general"
+  public_retention_sec: 3600    # default window; admin can override per-channel
+  max_buffer_messages: 2000     # ring-buffer cap per channel
+  sweep_interval_sec: 30        # how often the retention timer runs
+
+files:
+  root: "./share"               # directory exposed to clients (Phase 3)
+  max_upload_bytes: 268435456   # 256 MB
+  allow_extensions: ["*"]
+
+bulletin:
+  max_posts: 500
+  max_post_bytes: 32768
+
+tracking:
+  enabled: false                # false = private server, invisible
+  registry_url: "https://registry.coldcircle.net"
+  server_name: "Nightfall"
+  description: "Late-night talks, files, and noise."
+  heartbeat_sec: 60
