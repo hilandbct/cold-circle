@@ -157,6 +157,6 @@ when the process exits.
 | 6 | Admin UI, auto-reconnect, disconnect button | ✅ Done |
 | 7 | P2 polish (isAdmin, ban handlers, CSS) | ✅ Done |
 | 8 | Registry discovery (mDNS / broadcast) | 📋 Planned |
-| 9 | Draggable desktop frame UI | 📋 Planned |
+| 9 | Draggable desktop frame UI (drag, resize, fullscreen) | ✅ Done |
 
 Full spec details are in the technical specification document (spec.md).
