@@ -24,7 +24,44 @@
       background: var(--bg); color: var(--fg);
       font-family: var(--mono); font-size: 13px; line-height: 1.45;
     }
-    #app { display: flex; flex-direction: column; height: 100vh; }
+    /* Desktop window frame (Phase 9) — draggable, resizable */
+    #app {
+      position: absolute;
+      left: 50%; top: 50%;
+      transform: translate(-50%, -50%);
+      width: 960px; height: 640px;
+      min-width: 480px; min-height: 320px;
+      display: flex; flex-direction: column;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.5);
+      overflow: hidden;
+      z-index: 1;
+      cursor: default;
+    }
+    /* Full-screen mode (toggled by double-clicking title bar) */
+    #app.fullscreen {
+      position: static;
+      transform: none;
+      width: 100vw; height: 100vh;
+      border: 0; border-radius: 0;
+      box-shadow: none;
+    }
+    /* Dragging state */
+    #app.dragging {
+      transition: none;
+      cursor: grabbing;
+    }
+    /* Resize handle (bottom-right corner) */
+    #resizeHandle {
+      position: absolute;
+      right: 0; bottom: 0;
+      width: 16px; height: 16px;
+      cursor: nwse-resize;
+      z-index: 10;
+      background: linear-gradient(135deg, transparent 50%, var(--accent-dim) 50%);
+    }
 
     /* Top status bar */
     header {
@@ -295,7 +332,23 @@
 </head>
 <body>
   <div id="app">
-    <header>
+    <!-- Window title bar (drag handle) -->
+    <div id="windowTitleBar" style="
+      display: flex; align-items: center; gap: 8px;
+      padding: 6px 10px; background: var(--bg-panel);
+      border-bottom: 1px solid var(--border);
+      cursor: grab; user-select: none;
+      font-size: 11px; letter-spacing: 0.5px;
+    ">
+      <span style="color:var(--accent);font-weight:bold">COLD CIRCLE</span>
+      <span style="color:var(--fg-dim);flex:1;text-align:center;font-size:10px">
+drag to move · double-click to toggle fullscreen · drag corner to resize
+      </span>
+      <span class="dot off" id="statusDot"></span>
+      <span style="color:var(--fg-dim);font-size:10px" id="connMeta">disconnected</span>
+    </div>
+    <!-- Original header (status bar, hidden in windowed mode, shown in fullscreen) -->
+    <header style="display:none">
       <span class="dot off" id="statusDot"></span>
       <span class="title">COLD CIRCLE</span>
       <span class="meta" id="connMeta">disconnected</span>
@@ -379,6 +432,8 @@
         </div>
       </div>
     </main>
+    <!-- Resize handle (bottom-right corner) -->
+    <div id="resizeHandle"></div>
   </div>
 
   <div id="connect">
@@ -1650,6 +1705,91 @@
     // --- Admin panel event listeners ---
     // Admin panel is hidden by default; shown only when role === "admin".
     els.adminSection.style.display = "none";
-  </script>
+
+    // --- Desktop window frame (Phase 9) ---------------------------------------
+    const appEl = $("app");
+    const titleBar = $("windowTitleBar");
+    const resizeHandle = $("resizeHandle");
+    const originalHeader = appEl.querySelector("header");
+
+    // Dragging state.
+    let dragging = false;
+    let dragStartX, dragStartY;
+    let appLeft, appTop;
+
+    // Resizing state.
+    let resizing = false;
+    let resizeStartX, resizeStartY;
+    let resizeStartW, resizeStartH;
+
+    // Toggle fullscreen on double-click of title bar.
+    titleBar.addEventListener("dblclick", () => {
+      appEl.classList.toggle("fullscreen");
+      // Show/hide original header based on mode.
+      originalHeader.style.display = appEl.classList.contains("fullscreen") ? "" : "none";
+    });
+
+    // Drag: mousedown on title bar.
+    titleBar.addEventListener("mousedown", (e) => {
+      // Don't drag if clicking a status dot (it's interactive).
+      if (e.target.classList.contains("dot")) return;
+      dragging = true;
+      appEl.classList.add("dragging");
+      // Remove transform translate so absolute positioning takes over.
+      appEl.style.transform = "none";
+      // Initialize position from current rect.
+      const rect = appEl.getBoundingClientRect();
+      appLeft = rect.left;
+      appTop = rect.top;
+      dragStartX = e.clientX;
+      dragStartY = e.clientY;
+      e.preventDefault();
+    });
+
+    // Mouse move: update position.
+    document.addEventListener("mousemove", (e) => {
+      if (dragging) {
+        const dx = e.clientX - dragStartX;
+        const dy = e.clientY - dragStartY;
+        appEl.style.left = (appLeft + dx) + "px";
+        appEl.style.top = (appTop + dy) + "px";
+      }
+      if (resizing) {
+        const dx = e.clientX - resizeStartX;
+        const dy = e.clientY - resizeStartY;
+        const w = Math.max(480, resizeStartW + dx);
+        const h = Math.max(320, resizeStartH + dy);
+        appEl.style.width = w + "px";
+        appEl.style.height = h + "px";
+      }
+    });
+
+    // Mouse up: stop dragging/resizing.
+    document.addEventListener("mouseup", () => {
+      if (dragging) {
+        dragging = false;
+        appEl.classList.remove("dragging");
+      }
+      if (resizing) {
+        resizing = false;
+        appEl.style.cursor = "";
+      }
+    });
+
+    // Resize: mousedown on resize handle.
+    resizeHandle.addEventListener("mousedown", (e) => {
+      resizing = true;
+      appEl.style.cursor = "nwse-resize";
+      resizeStartX = e.clientX;
+      resizeStartY = e.clientY;
+      const rect = appEl.getBoundingClientRect();
+      resizeStartW = rect.width;
+      resizeStartH = rect.height;
+      e.preventDefault();
+      e.stopPropagation();
+    });
+
+    // --- Wire up the UI ------------------------------------------------------
+    els.connectBtn.addEventListener("click", connect);
 </body>
 </html>
